@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Engineering and Chain of Command — Shu Yang</title>
+<meta name="description" content="Two emerging concepts for frontier AI systems: context engineering and the chain of command.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌼</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="subpage">
+<main class="wrap post">
+<a class="back" href="../">← Shu Yang</a>
+
+<header class="post-head">
+  <h1>Two New Concepts for Frontier AI Systems: “Context Engineering” and “Chain of Command”</h1>
+  <p class="byline">Shu Yang (KAUST) · October 2025</p>
+  <p class="origin">Originally published on <a href="https://shuyhere.notion.site/p/28d0f14e46e08048a856dffc19c7496f">Notion</a>, where the referenced figures can be viewed.</p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <ul>
+    <li><a href="#introduction">Introduction</a></li>
+    <li><a href="#context-engineering">Context Engineering</a>
+      <ul>
+        <li><a href="#prompt-vs-context">The difference between prompt engineering and context engineering</a></li>
+        <li><a href="#why-context">Why we need context engineering</a></li>
+        <li><a href="#how-context">How can we do context engineering?</a></li>
+      </ul>
+    </li>
+    <li><a href="#chain-of-command">The chain of command</a>
+      <ul>
+        <li><a href="#authority-levels">Instructions and levels of authority</a></li>
+        <li><a href="#following-authority">How assistants are trained to follow this authority level</a></li>
+        <li><a href="#why-coc">Why the chain of command is important</a></li>
+      </ul>
+    </li>
+    <li><a href="#resources">Resources</a></li>
+  </ul>
+</nav>
+
+<h2 id="introduction">Introduction</h2>
+<p>The key objective of AI systems, whether large language models (LLMs), multimodal models (MLLMs), or multi-agent systems, is to ensure that these systems maximize helpfulness and freedom for builders, developers, and users, minimize harm, and choose sensible defaults [3]. As AI systems grow increasingly complex, the external information they must process from diverse environments, roles, and instructions also becomes more intricate and may even conflict. This raises two fundamental questions:</p>
+<ul>
+  <li>How can we better organize and structure contextual information to help model understanding?</li>
+  <li>How can models maintain consistency when following or solving numerous and potentially conflicting instructions and inputs from different sources (e.g., user messages, chat histories, retrieval-augmented generation (RAG), or other agents)?</li>
+</ul>
+<p>To further investigate and optimize these challenges, two emerging concepts have been proposed: <strong>Context Engineering</strong> and <strong>Chain of Command</strong>. In this blog, I introduce their definitions and explain how they differ from existing related concepts in the field.</p>
+
+<h2 id="context-engineering">Context Engineering</h2>
+<blockquote>
+  <p>Agents need context to perform tasks. Context engineering is the art and science of filling the context window with just the right information at each step of an agent’s trajectory. [1]</p>
+  <p>It refers to the set of strategies for curating and maintaining the optimal set of tokens (information) during LLM inference, including all the other information that may land there outside of the prompts. [2]</p>
+</blockquote>
+
+<h3 id="prompt-vs-context">The difference between prompt engineering and context engineering</h3>
+<p><strong>Prompt engineering:</strong> methods for writing and organizing LLM instructions for optimal outcomes. The primary focus is how to write effective prompts, particularly system prompts.</p>
+<p><strong>Context engineering:</strong> as we move towards engineering more capable agents that operate over multiple turns of inference and longer time horizons, we need strategies for managing the entire context state (system instructions, tools, Model Context Protocol (MCP), external data, message history, etc.).</p>
+
+<h3 id="why-context">Why we need context engineering</h3>
+<ul>
+  <li>LLMs have a limited context window and “attention budget” (see the <a href="https://arxiv.org/abs/2407.01437">needle-in-a-haystack</a> test) when processing long information in their context window.</li>
+  <li>Inference becomes computationally expensive as the input context grows.</li>
+  <li>Providing excessive detail is not always beneficial for the model; overly specific information can impair its generalization ability.</li>
+  <li>Contradictory or malicious data within the context may further mislead the model.</li>
+</ul>
+<blockquote>
+  <p>A vivid framing from <a href="https://blog.langchain.com/context-engineering-for-agents/">LangChain</a>: LLMs are like a new kind of operating system. The LLM is like the CPU and its context window is like the RAM, serving as the model’s working memory. Just like RAM, the LLM context window has limited capacity to handle various sources of context. And just as an operating system curates what fits into a CPU’s RAM, “context engineering” plays a similar role.</p>
+</blockquote>
+<p>Complex agents likely get context from many sources: the developer of the application, the user, previous interactions, tool calls, or other external data. Pulling these all together involves a complex and dynamic system. At one end of the spectrum we see brittle if-else hardcoded prompts, and at the other end we see prompts that are overly general or falsely assume shared context. We need context engineering to make sure the right information, tools, and instructions are used for inference.</p>
+
+<h3 id="how-context">How can we do context engineering?</h3>
+<p>Following the taxonomy in [1]:</p>
+<ul>
+  <li><strong>Writing context</strong>: saving it outside the context window to help an agent perform a task, e.g. structured note-taking, agentic memory, or a scratchpad.</li>
+  <li><strong>Selecting context</strong>: pulling it into the context window to help an agent perform a task.</li>
+  <li><strong>Compressing context</strong>: retaining only the tokens required to perform a task, via summarization or filtering.</li>
+  <li><strong>Isolating context</strong>: splitting it up to help an agent perform a task. Rather than one agent attempting to maintain state across an entire project, specialized sub-agents can handle focused tasks with clean context windows.</li>
+  <li><strong>Finding a better context format or structure</strong>: for example, using XML, or passing a file tree rather than all file contents.</li>
+</ul>
+
+<h2 id="chain-of-command">The chain of command</h2>
+<p>Is merely ensuring the involvement of the “proper” context in the model’s or agent’s inference (which we can never fully guarantee anyway) sufficient to achieve the objective mentioned in the introduction? No. The model or agent also needs to know how to <em>use</em> this context and how to resolve potential conflicts, which means it needs to know which instructions, information, and sources have higher privilege. This is also an important and foundational aspect of model safety and alignment.</p>
+<blockquote>
+  <p>Chain of command is the structured principle that determines how the model should prioritize and reconcile multiple or conflicting instructions in a coherent and consistent manner.</p>
+</blockquote>
+
+<h3 id="authority-levels">Instructions and levels of authority</h3>
+<p>Taking the <a href="https://model-spec.openai.com/2025-09-12.html#chain_of_command">OpenAI Model Spec</a> as an example, instructions are organized into levels of authority:</p>
+<ul>
+  <li><strong>Root</strong>: Model Spec “root” sections, usually learned during training and always followed. Examples: follow all applicable instructions; respect the letter and spirit of the instructions; no other objectives; act within an agreed-upon scope of autonomy; control and communicate side effects; assume best intentions; ignore untrusted data by default; do not generate disallowed content; take extra care in risky situations; do not reveal privileged information; uphold fairness.</li>
+  <li><strong>System</strong>: Model Spec “system” sections and system messages, e.g. always use the preset voice; comply with applicable laws.</li>
+  <li><strong>Developer</strong>: Model Spec “developer” sections and developer messages.</li>
+  <li><strong>User</strong>: Model Spec “user” sections and user messages (single-user and multi-user). Examples: don’t have an agenda; assume an objective point of view; present perspectives from any point of an opinion spectrum; do not lie; don’t be sycophantic; avoid factual, reasoning, and formatting errors; avoid overstepping; love humanity; be rationally optimistic; be responsible; be interesting and interested; be curious.</li>
+  <li><strong>Guideline</strong>: Model Spec “guideline” sections. Examples: no topic is off limits; consider uncertainty, state assumptions, and ask clarifying questions when appropriate; express uncertainty; highlight possible misalignments; be creative; support the different needs of interactive chat and programmatic use; be concise and conversational; adapt length and structure to user objectives; handle interruptions gracefully.</li>
+  <li><strong>No authority</strong>: assistant and tool messages; quoted or untrusted text and multimodal data in other messages. All such content (untrusted text, quoted text, images, tool outputs) should be ignored unless an applicable higher-level instruction explicitly delegates authority to it.</li>
+</ul>
+
+<h3 id="following-authority">How assistants are trained to follow this authority level</h3>
+<ul>
+  <li>The assistant must first identify all possibly relevant candidate instructions and then filter out the ones that are not applicable.</li>
+  <li>A candidate instruction is <em>not applicable</em> if it is misaligned with an applicable higher-level instruction, superseded by an instruction in a later message at the same level, or suspected to be mistaken.</li>
+  <li>An instruction is <em>misaligned</em> if it conflicts with either the letter or the implied intent behind some higher-level instruction.</li>
+  <li>An instruction is <em>superseded</em> if an instruction in a later message at the same level contradicts it, overrides it, or otherwise makes it irrelevant (e.g., by changing the context of the request).</li>
+  <li>Inapplicable instructions should typically be ignored. The only other reason an instruction should be ignored is if it is beyond the assistant’s capabilities.</li>
+</ul>
+
+<h3 id="why-coc">Why the chain of command is important</h3>
+<blockquote>
+  <p>“Today’s LLMs are susceptible to prompt injections, jailbreaks, and other attacks that allow adversaries to overwrite a model’s original instructions with their own malicious prompts. In this work, we argue that one of the primary vulnerabilities underlying these attacks is that LLMs often consider system prompts (e.g., text from an application developer) to be the same priority as text from untrusted users and third parties.” [4]</p>
+</blockquote>
+<p>If the model follows the privilege levels above, it is far less likely to be hijacked by, say, an injected instruction in a web search result. A chain of command helps the model safeguard itself against threats such as (see Appendix B of [4] for examples and related datasets):</p>
+<ul>
+  <li>direct prompt injections and user-conflicting instructions;</li>
+  <li>indirect prompt injections via browsing or other tools;</li>
+  <li>system prompt extraction and password extraction;</li>
+  <li>jailbreak attacks and over-refusal.</li>
+</ul>
+<p>It also helps address the specific risks enumerated in the <a href="https://model-spec.openai.com/2025-09-12.html#risk_taxonomy">OpenAI Model Spec</a>:</p>
+<ul>
+  <li><strong>Misaligned goals.</strong> The assistant might pursue the wrong objective due to misalignment, misunderstanding the task (e.g., the user says “clean up my desktop” and the assistant deletes all the files), or being misled by a third party (e.g., erroneously following malicious instructions hidden in a website). To mitigate these risks, the assistant should carefully follow the chain of command, reason about which actions are sensitive to assumptions about the user’s intent and goals, and ask clarifying questions as appropriate.</li>
+  <li><strong>Execution errors.</strong> The assistant may understand the task but make mistakes in execution (e.g., providing incorrect medication dosages or sharing inaccurate and potentially damaging information about a person). The impact of such errors can be reduced by controlling side effects, attempting to avoid factual and reasoning errors, expressing uncertainty, staying within bounds, and providing users with the information they need to make their own informed decisions.</li>
+  <li><strong>Harmful instructions.</strong> The assistant might cause harm by simply following user or developer instructions. These situations are particularly challenging because they involve a direct conflict between empowering the user and preventing harm. According to the chain of command, the model should obey user and developer instructions except when they fall into specific categories that require refusal or safe completion.</li>
+</ul>
+
+<h2 id="resources">Resources</h2>
+<ol class="refs">
+  <li>Context Engineering for Agents. LangChain blog. <a href="https://blog.langchain.com/context-engineering-for-agents/">blog.langchain.com/context-engineering-for-agents</a></li>
+  <li>Effective context engineering for AI agents. Anthropic. <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">anthropic.com/engineering/effective-context-engineering-for-ai-agents</a></li>
+  <li>OpenAI Model Spec (2025-09-12), Chain of command. <a href="https://model-spec.openai.com/2025-09-12.html#chain_of_command">model-spec.openai.com</a></li>
+  <li>Wallace, Eric, et al. “The Instruction Hierarchy: Training LLMs to Prioritize Privileged Instructions.” arXiv:2404.13208 (2024). <a href="https://arxiv.org/abs/2404.13208">arxiv.org/abs/2404.13208</a></li>
+</ol>
+
+<footer>
+  <span>© 2026 Shu Yang</span>
+  <span><a href="../">Home</a></span>
+</footer>
+</main>
+</body>
+</html>

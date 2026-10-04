@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using OpenClaw in Research — Shu Yang</title>
+<meta name="description" content="A simple guide and best practices for using OpenClaw and TAKO in research workflows.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧝</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="subpage">
+<main class="wrap post">
+<a class="back" href="../">← Shu Yang</a>
+
+<header class="post-head">
+  <h1>A Simple Guide and Best Practices for Using OpenClaw in Research</h1>
+  <p class="byline">Shu Yang (KAUST) · 2026/03</p>
+  <p class="origin">原文发布于 <a href="https://shuyhere.notion.site/p/31d0f14e46e080ee8391d86ce8cbdb0a">Notion</a>，截图与配图请见原文。</p>
+</header>
+
+<p>分享使用 OpenClaw 以及最近自己开发的 TAKO（<a href="https://github.com/Korde-AI/tako">Korde-AI/tako</a>）部署自己工作流这段时间的一些感悟、发现和实践。这已经是两周以来第一次试图给人类输出些什么有营养的东西了（AI 的坏处 +1）。</p>
+
+<h2 id="intuition">基本直觉</h2>
+<p>首先推荐 <a href="https://skillsbench.ai/">skillsbench.ai</a> 上的一张图。它讲的是现在类似 OpenClaw 这种系统的几个抽象层：</p>
+<ul>
+  <li><strong>CPU</strong> 是大模型。</li>
+  <li><strong>操作系统</strong> 是 <a href="https://github.com/openclaw/openclaw/tree/main/src">openclaw/src</a> 或 <a href="https://github.com/Korde-AI/tako/tree/main/src">tako/src</a> 里的内容，负责调度 agent、管理工具和 I/O，以及怎么 load skill 之类的。类似于我们拿到了一台搭载 M5 芯片、装了 macOS 26 的 MacBook。</li>
+  <li>拿到电脑之后，我们需要按照自己的需求安装各种 application，这就是 <strong>skills</strong>。</li>
+</ul>
+<p>到这里都不是什么 magic 的部分。真正 magic 的部分是：</p>
+<ul>
+  <li><strong>CPU 完全了解操作系统，且可以和 user 对话、记住 user 偏好。</strong> 只要成功部署好 OpenClaw 之类的系统并进行对话，接下来就可以无限用自然语言创造 agent、创造 skill、更改权限和配置。“只要这台电脑跑起来就没有很陡峭的学习曲线”（Siri 本身都没有很好做到这一点）。可以自由自在地让 agent 自己改自己、检查自己，以及给 user 提供各种操作指导。背后其实就是把项目本身的各种 doc 和 cmd 开放给 agent，让它可以看到且可以使用。</li>
+  <li><strong>skill 机制的可塑性非常强。</strong> 目前这种 agent OS 的核心，就是允许 user 用类似 Minecraft 中工作台一样的规则造东西（甚至造新的工作台）：比如创建其他 agent；比如创建一个专属 skill 用来拯救我的语言障碍；如果觉得创建 skill 的方式不符合心意，也可以自己创建一个“创建 skill 的 skill”，定义一些行为（先搜索和安全扫描现有的再创建之类的），以此类推无限套娃，不断创建快捷指令。</li>
+  <li><strong>支持各种 channel。</strong> 其实 channel 本身也可以看成 skill，我们可以创建 skill 链接到任何工作流（只要这个 channel 是允许的）。所以“可以被 agent 使用的产品才是好产品”这句话的含金量还在上升。非常推荐 Discord，因为 agent 可以自由给自己创建 channel 以及新开 thread。</li>
+</ul>
+<p>因此最基本的直觉是：当 CPU（基础模型）足够强大，而操作系统（agent harness）又保持高度抽象与开放时，这个平台本身就会变成一种“通用创造环境”，几乎任何东西都可以在其之上被构建出来（真·开放世界）。现在也已经出现了各种方便加载别人 agent 配置、下载别人 skill 的方式，未来这种“加 mod”式玩法也必然成为生态，让大家能够克隆和分支别人的开放世界。</p>
+<p>所以动手能力比较强的小伙伴就会发现 OpenClaw 的百万行代码有些冗余了：其实只需要 <code>add agent</code>、<code>find-skill</code>、<code>add-skill</code>，最多再加个 <code>audit-skill</code>，就可以创造出任何自己想做的东西（skill 不只是 md 说明文件，也可以包括可 plugin 的代码）。所以基建狂魔如我就自己写了 <a href="https://github.com/Korde-AI/tako">Korde-AI/tako</a> 来实现最基本的“工作台”需求，并且更方便修改。</p>
+
+<h2 id="practice">一些实践指南</h2>
+<h3>一定要试试 Discord</h3>
+<p>创建一个 Discord server，然后在 server 中和你的首席 agent（也就是你绑定的第一个 agent）对话来创建更多的 channel 和 agent。使用 Discord 的主要原因是 agent 可以拥有开 channel、开 thread 的权限，方便监督各种 subagent 任务以及更好地区分不同的 workspace；也可以自由上传 attachment。对于超长的 agent 输出（比如 log），不用 attachment 会刷屏，观感极差。（当然也可以 vibe code 一个类似的 dashboard 来 track，但是……）</p>
+<p>如果你正在用其他 channel（比如 Telegram）与 OpenClaw 或 TAKO 对话，可以直接问它“我想把你添加到 Discord 应该怎么做”。添加之后就可以继续直接和这个 agent 对话、定义它的各种行为。</p>
+<p>使用 Discord 的另一个好处在于可以直接把其他 coauthor 拉进某个 project 的 Discord 进行多人协作（这样很多人可以一起“被 AI 使用”，大大减少心智负担）。前提是你的 gateway 部署在比较安全的环境，或者合作者和 agent 的权限有限，不然其他人可以获得服务器上的任何东西。（Telegram group 也可以，但需要手动创建和配置 group，不太适合懒人。）</p>
+
+<h3>不要在最开始就创建一大堆 bot</h3>
+<p>agent 分为两种：一种是可以直接对话、看得到的 agent，需要绑定和配对到 Telegram bot 或 Discord app，需要 token；另一种是没有绑定的 subagent，但它们可以直接被我们看得到的 agent 调用。所以并不需要一下子创建和绑定一大堆 bot，最后 bot 和 bot 之间的界限会越来越模糊。</p>
+<p>对我来说最好的实践是：</p>
+<ul>
+  <li>把第一个绑定的 bot 当作真正的 <strong>admin</strong>：监管系统日志、检查工作状态、创建 agent、给其他 agent 分配权限、拉进各种 channel 的活都由它来干。</li>
+  <li>让 admin 创建一个 <strong>project manager agent</strong>，它需要能够：给不同的 project 组织专属的工作空间和 channel，管理项目进度；调用一些 subagent，比如 coding agent 或 literature review agent（这些可以不绑定 bot，直接让 PM agent 创建并当作 subagent 调用），也可以调用本地的 Claude Code、Codex 等。这些都可以通过告诉它在后台挂起或启动一个新的 thread 来进行，不影响当前的聊天。比如我曾同时调用 Claude Code 写三个完全不同的需求。</li>
+</ul>
+<p>注意，调用 Codex、Claude Code、Gemini CLI 等其实都可以视为 agent 的 skill，这也是为什么说可以无限套娃拓展。可以直接把“创建 project”写成一个 skill（当然不需要自己写，告诉 agent，它会自己使用 create-skill 这个 skill）。</p>
+<p>还可以加一些骚操作，比如创建或下载一个访问和同步 Overleaf 的工具（直接问它“我想实现这个功能应该怎么做”，agent 会自己给你意见），给它一些访问其他机器的权限，它就可以把现在所有的代码和 paper 拉取到一个个 workspace 中。</p>
+
+<h3>skill 不是越多越好</h3>
+<p>不要在一开始就安装一大堆 skill。除了安全风险，其实也会让 agent 非常困惑，并且 skill 包含了 skill 作者的使用习惯。所以最好的办法就是通过自己最经常的使用，把它培养成自己喜欢的样子。建造游戏自己建造才比较有趣。</p>
+<p>比如每个人都有自己喜欢的信息获取渠道，只有告诉 agent 我喜欢从哪里获取信息、希望看到什么格式，并让它把这个写成 skill，才可以真的获得对自己胃口的日报周报。</p>
+
+<h2 id="principle">基本原则</h2>
+<p>一点一点建造自己的东西 + 哪里不会就直接问 agent，是创建最适合自己的工作流的最好办法。毕竟之前不是所有人都会写 app，但现在所有人都可以写 skill（很期待真正的原生 AIOS 出现）。</p>
+<p>P.S. 本来也打算把自己的工作流打包成 mod 方便大家 load，但发现其实很多东西都是符合我自己的使用习惯而不是通用的。所以，建造游戏还是自己建最好玩。</p>
+
+<h2 id="end">放在最后</h2>
+<p>一定要注意用脑卫生，以及适度晒太阳 + 和人类对话。</p>
+
+<footer>
+  <span>© 2026 Shu Yang</span>
+  <span><a href="../">Home</a></span>
+</footer>
+</main>
+</body>
+</html>
