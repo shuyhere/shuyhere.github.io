@@ -79,8 +79,9 @@ blockquote p:last-child { margin: 0; }
 .identity .role { color: var(--muted); margin: 0; }
 .links { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; margin: .9rem 0 0; padding: 0; list-style: none; font-size: .95rem; }
 .links li { display: flex; align-items: center; }
-.links li::after { content: ""; }
-.email-link { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; }
+.links a { display: inline-flex; align-items: center; min-height: 1.65em; }
+.email-link { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 1.65em; }
+.email-link svg { display: block; transform: translateY(.04em); }
 
 nav.top { font-size: .95rem; margin: 1.6rem 0 0; display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; color: var(--muted); }
 nav.top a { color: var(--text); }
